@@ -21,6 +21,22 @@ type bb struct {
 	VV *bb
 }
 
+type CustomType struct {
+	AnyJSON interface{}
+}
+
+func (c *CustomType) MarshalGOBE(dst []byte) error {
+	return nil
+}
+
+func (c *CustomType) UnmarshalGOBE(src []byte) error {
+	return nil
+}
+
+func (c *CustomType) SizeGOBE() uint64 {
+	return 0
+}
+
 func init() {
 	V := aa[int]{}
 	_ = V

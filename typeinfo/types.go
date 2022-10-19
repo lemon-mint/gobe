@@ -1,6 +1,7 @@
 package typeinfo
 
 import (
+	"go/types"
 	"reflect"
 	"strconv"
 )
@@ -41,6 +42,8 @@ const (
 	Slice
 	Array
 	Map
+
+	Custom
 )
 
 func TypeKind(t Type) Kind {
@@ -96,6 +99,8 @@ func TypeKind(t Type) Kind {
 		return Map
 	case *invalidType:
 		return Invalid
+	case *CustomType:
+		return Custom
 	}
 
 	return Invalid
@@ -163,6 +168,14 @@ type invalidType struct{}
 
 func (invalidType) String() string {
 	return "invalid"
+}
+
+type CustomType struct {
+	Underlying types.Type
+}
+
+func (CustomType) String() string {
+	return "custom"
 }
 
 var InvalidType = &invalidType{}

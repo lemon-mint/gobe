@@ -1,11 +1,42 @@
 package typeconv
 
 import (
+	"go/ast"
+	"go/importer"
+	"go/parser"
+	"go/token"
 	"go/types"
 	"reflect"
 
 	"github.com/lemon-mint/gobe/typeinfo"
 )
+
+func getCustomTypeIface() *types.Interface {
+	fset := token.NewFileSet()
+	const code = `
+	package typeconv
+
+	type GOBE_CUSTOM_TYPE interface {
+		MarshalGOBE(dst []byte) error
+		UnmarshalGOBE(src []byte) error
+		SizeGOBE() uint64
+	}
+	`
+	f, err := parser.ParseFile(fset, "customtype.go", code, 0)
+	if err != nil {
+		panic(err)
+	}
+
+	conf := types.Config{Importer: importer.Default()}
+	pkg, err := conf.Check("typeconv", fset, []*ast.File{f}, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return pkg.Scope().Lookup("GOBE_CUSTOM_TYPE").Type().Underlying().(*types.Interface).Complete()
+}
+
+var ctypeIface = getCustomTypeIface()
 
 type TypeConvCtx struct {
 	typemap map[types.Type]typeinfo.Type
@@ -20,6 +51,18 @@ TAIL_CALL:
 	if v, ok := ctx.typemap[tt]; ok {
 		return v
 	}
+
+	// Check if tt implements GOBE_CUSTOM_TYPE interface.
+	if t, ok := tt.(*types.Named); ok {
+		if types.AssignableTo(t, ctypeIface) || types.AssignableTo(types.NewPointer(t), ctypeIface) {
+			vv := &typeinfo.CustomType{
+				Underlying: tt,
+			}
+			return vv
+		} else {
+		}
+	}
+
 	switch t := tt.(type) {
 	case *types.Basic:
 		vv := &typeinfo.BasicType{}

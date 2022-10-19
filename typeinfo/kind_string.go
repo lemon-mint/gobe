@@ -32,11 +32,12 @@ func _() {
 	_ = x[Slice-21]
 	_ = x[Array-22]
 	_ = x[Map-23]
+	_ = x[Custom-24]
 }
 
-const _Kind_name = "InvalidBoolIntInt8Int16Int32Int64UintUint8Uint16Uint32Uint64UintptrFloat32Float64Complex64Complex128StringUnsafePointerStructPointerSliceArrayMap"
+const _Kind_name = "InvalidBoolIntInt8Int16Int32Int64UintUint8Uint16Uint32Uint64UintptrFloat32Float64Complex64Complex128StringUnsafePointerStructPointerSliceArrayMapCustom"
 
-var _Kind_index = [...]uint8{0, 7, 11, 14, 18, 23, 28, 33, 37, 42, 48, 54, 60, 67, 74, 81, 90, 100, 106, 119, 125, 132, 137, 142, 145}
+var _Kind_index = [...]uint8{0, 7, 11, 14, 18, 23, 28, 33, 37, 42, 48, 54, 60, 67, 74, 81, 90, 100, 106, 119, 125, 132, 137, 142, 145, 151}
 
 func (i Kind) String() string {
 	if i >= Kind(len(_Kind_index)-1) {
