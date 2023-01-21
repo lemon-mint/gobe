@@ -1,4 +1,4 @@
-# Go Binary Encoding
+# GOBE: Go Binary Encoding
 
 Code Generation-based Go Type Serialization Library
 
@@ -6,8 +6,8 @@ Code Generation-based Go Type Serialization Library
 
 ```go
 type GOBE_CUSTOM_TYPE interface {
-	MarshalGOBE(dst []byte) error
-	UnmarshalGOBE(src []byte) error
+	MarshalGOBE(dst []byte) uint64
+	UnmarshalGOBE(src []byte) (offset uint64, ok bool)
 	SizeGOBE() uint64
 }
 ```
