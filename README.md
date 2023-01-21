@@ -1,6 +1,6 @@
 # GOBE: Go Binary Encoding
 
-Code Generation-based Go Type Serialization Library
+Code Generation based Go Type Serialization Library
 
 ## Custom Marshaler/Unmarshaler
 
