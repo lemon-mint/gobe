@@ -9,6 +9,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -49,9 +50,12 @@ func main() {
 
 	var conf loader.Config
 	conf.Import(os.Args[1])
+	conf.TypeChecker.IgnoreFuncBodies = true
+	conf.TypeChecker.DisableUnusedImportCheck = true
+	conf.AllowErrors = true
 	lp, err := conf.Load()
 	if err != nil {
-		panic(err)
+		log.Fatalln(err)
 	}
 
 	var pkgname string
@@ -111,22 +115,24 @@ func main() {
 	generated.WriteString("package ")
 	generated.WriteString(pkgname)
 	generated.WriteString("\n\n")
-	generated.WriteString("import (\n")
+	if len(gctx2.LibAlias) > 0 {
+		generated.WriteString("import (\n")
 
-	keys := make([]string, 0, len(gctx2.LibAlias))
-	for k := range gctx2.LibAlias {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+		keys := make([]string, 0, len(gctx2.LibAlias))
+		for k := range gctx2.LibAlias {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 
-	for _, k := range keys {
-		generated.WriteString("\t")
-		generated.WriteString(gctx2.LibAlias[k])
-		generated.WriteString(" \"")
-		generated.WriteString(k)
-		generated.WriteString("\"\n")
+		for _, k := range keys {
+			generated.WriteString("\t")
+			generated.WriteString(gctx2.LibAlias[k])
+			generated.WriteString(" \"")
+			generated.WriteString(k)
+			generated.WriteString("\"\n")
+		}
+		generated.WriteString(")\n\n")
 	}
-	generated.WriteString(")\n\n")
 
 	for _, b := range tt {
 		formated, err := format.Source(gctx2.Generated[b.Type])
