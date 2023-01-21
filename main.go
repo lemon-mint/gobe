@@ -1140,6 +1140,12 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 
 		KeyType := getTypeName(ctx, v.Key())
 		ValueType := getTypeName(ctx, v.Elem())
+		//    // Key: <key>, Value: <value>
+		ctx.Generated[rt] = fmt.Appendf(
+			ctx.Generated[rt],
+			"// Key: %s, Value: %s\n",
+			KeyType, ValueType,
+		)
 
 		ctx.Generated[rt] = fmt.Appendf(
 			ctx.Generated[rt],
@@ -1662,7 +1668,10 @@ func basicType(t types.Type) *types.Basic {
 }
 
 func getTypeName(ctx *GenerateContext, t types.Type) string {
-	if n, ok := t.(*types.Named); ok {
+	switch n := t.(type) {
+	case *types.Pointer:
+		return "*" + getTypeName(ctx, n.Elem())
+	case *types.Named:
 		if ctx.RootPackage != n.Obj().Pkg() {
 			// Auto Import
 			var pkg string
