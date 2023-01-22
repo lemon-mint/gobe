@@ -25,8 +25,8 @@ go install github.com/lemon-mint/gobe@latest
 
 ```go
 type GOBE_CUSTOM_TYPE interface {
-	MarshalGOBE(dst []byte) uint64
-	UnmarshalGOBE(src []byte) (offset uint64, ok bool)
-	SizeGOBE() uint64
+	ZZMarshalGOBE(dst []byte) uint64
+	ZZUnmarshalGOBE(src []byte) (offset uint64, ok bool)
+	ZZSizeGOBE() uint64
 }
 ```

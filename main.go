@@ -25,9 +25,9 @@ func getCustomTypeIface() *types.Interface {
 	package typeconv
 
 	type GOBE_CUSTOM_TYPE interface {
-		MarshalGOBE(dst []byte) uint64
-		UnmarshalGOBE(src []byte) (offset uint64, ok bool)
-		SizeGOBE() uint64
+		ZZMarshalGOBE(dst []byte) uint64
+		ZZUnmarshalGOBE(src []byte) (offset uint64, ok bool)
+		ZZSizeGOBE() uint64
 	}
 	`
 	f, err := parser.ParseFile(fset, "customtype.go", code, 0)
@@ -412,10 +412,10 @@ func generateMarshalBody(ctx *GenerateContext, name string, __offset string, rt 
 	)
 
 	if isCustomType(t) {
-		//    __offset += `v.Name()`.MarshalGOBE(dst[__offset:])
+		//    __offset += `v.Name()`.ZZMarshalGOBE(dst[__offset:])
 		ctx.Generated[rt] = fmt.Appendf(
 			ctx.Generated[rt],
-			"    %s += %s.MarshalGOBE(dst[%s:])\n",
+			"    %s += %s.ZZMarshalGOBE(dst[%s:])\n",
 			__offset, name, __offset,
 		)
 		return
@@ -924,10 +924,10 @@ func generateSizeBody(ctx *GenerateContext, name string, __size string, rt *type
 	)
 
 	if isCustomType(t) {
-		//    __size += `name`.SizeGOBE()
+		//    __size += `name`.ZZSizeGOBE()
 		ctx.Generated[rt] = fmt.Appendf(
 			ctx.Generated[rt],
-			"    %s += %s.SizeGOBE()\n",
+			"    %s += %s.ZZSizeGOBE()\n",
 			__size, name,
 		)
 		return
@@ -1144,7 +1144,7 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 	)
 
 	if isCustomType(t) {
-		//    __off, __ok := name.UnmarshalGOBE(src[offset:])
+		//    __off, __ok := name.ZZUnmarshalGOBE(src[offset:])
 		//    offset += __off
 		//    if !__ok {
 		//        return
@@ -1153,7 +1153,7 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 		__ok := ctx.nextName()
 		ctx.Generated[rt] = fmt.Appendf(
 			ctx.Generated[rt],
-			"    %s, %s := %s.UnmarshalGOBE(src[offset:])\n"+
+			"    %s, %s := %s.ZZUnmarshalGOBE(src[offset:])\n"+
 				"    offset += %s\n"+
 				"    if !%s {\n"+
 				"        return\n"+
