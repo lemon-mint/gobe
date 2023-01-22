@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/loader"
 )
@@ -1677,6 +1678,55 @@ func getTypeName(ctx *GenerateContext, t types.Type) string {
 	switch n := t.(type) {
 	case *types.Pointer:
 		return "*" + getTypeName(ctx, n.Elem())
+	case *types.Slice:
+		return "[]" + getTypeName(ctx, n.Elem())
+	case *types.Map:
+		return "map[" + getTypeName(ctx, n.Key()) + "]" + getTypeName(ctx, n.Elem())
+	case *types.Chan:
+		switch n.Dir() {
+		case types.SendRecv:
+			return "chan " + getTypeName(ctx, n.Elem())
+		case types.SendOnly:
+			return "chan<- " + getTypeName(ctx, n.Elem())
+		case types.RecvOnly:
+			return "<-chan " + getTypeName(ctx, n.Elem())
+		}
+	case *types.Signature:
+		var params []string
+		for i := 0; i < n.Params().Len(); i++ {
+			params = append(params, getTypeName(ctx, n.Params().At(i).Type()))
+		}
+		var results []string
+		for i := 0; i < n.Results().Len(); i++ {
+			results = append(results, getTypeName(ctx, n.Results().At(i).Type()))
+		}
+		return fmt.Sprintf("func(%s) (%s)", strings.Join(params, ", "), strings.Join(results, ", "))
+	case *types.Interface:
+		var methods []string
+		for i := 0; i < n.NumMethods(); i++ {
+			methods = append(methods, getTypeName(ctx, n.Method(i).Type()))
+		}
+		return fmt.Sprintf("interface{%s}", strings.Join(methods, "; "))
+	case *types.Struct:
+		var fields []string
+		for i := 0; i < n.NumFields(); i++ {
+			if n.Field(i).Anonymous() {
+				fields = append(fields, getTypeName(ctx, n.Field(i).Type()))
+			} else {
+				fields = append(fields, fmt.Sprintf("%s %s", n.Field(i).Name(), getTypeName(ctx, n.Field(i).Type())))
+			}
+		}
+		return fmt.Sprintf("struct{%s}", strings.Join(fields, "; "))
+	case *types.Array:
+		return fmt.Sprintf("[%d]%s", n.Len(), getTypeName(ctx, n.Elem()))
+	case *types.Basic:
+		return n.String()
+	case *types.Tuple:
+		var fields []string
+		for i := 0; i < n.Len(); i++ {
+			fields = append(fields, getTypeName(ctx, n.At(i).Type()))
+		}
+		return fmt.Sprintf("(%s)", strings.Join(fields, ", "))
 	case *types.Named:
 		if ctx.RootPackage != n.Obj().Pkg() {
 			// Auto Import
