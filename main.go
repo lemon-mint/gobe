@@ -46,11 +46,71 @@ func getCustomTypeIface() *types.Interface {
 
 var customTypeIface = getCustomTypeIface()
 
+var config struct {
+	// AllowUnsafe enables the use of unsafe conversions.
+	AllowUnsafe bool
+
+	// CopyBytes disables the use of zero-copy byte slices.
+	CopyBytes bool
+
+	// AllowZeroCopyString enables the use of zero-copy string conversions.
+	// AllowUnsafe must be enabled for this to work.
+	AllowZeroCopyString bool
+
+	// Path
+	Path string
+}
+
+func Usage() {
+	fmt.Fprintln(os.Stderr, "Usage: gobe [options] <path>")
+	fmt.Fprintln(os.Stderr, "Options:")
+	fmt.Fprintln(os.Stderr, "  --allow-unsafe    Allow unsafe conversions")
+	fmt.Fprintln(os.Stderr, "  --copy-bytes    Disable zero-copy bytes conversion")
+	fmt.Fprintln(os.Stderr, "  --allow-zero-copy-string    Enable zero-copy string conversion")
+}
+
+func ParseParams(args []string) {
+	if len(args) == 0 {
+		Usage()
+		os.Exit(1)
+		return
+	}
+
+	for i := 0; i < len(args)-1; i++ {
+		arg := args[i]
+		var name string
+		if strings.HasPrefix(arg, "--") {
+			name = arg[2:]
+		} else {
+			break
+		}
+
+		switch name {
+		case "allow-unsafe":
+			config.AllowUnsafe = true
+		case "copy-bytes":
+			config.CopyBytes = true
+		case "allow-zero-copy-string":
+			config.AllowZeroCopyString = true
+		default:
+			log.Fatalf("unknown argument: %s", arg)
+		}
+	}
+
+	path := args[len(args)-1]
+	if path == "" {
+		log.Fatalf("path is empty")
+	}
+	config.Path = path
+}
+
 func main() {
-	os.Remove(filepath.Join(os.Args[1], "gobe_generated.go"))
+	ParseParams(os.Args[1:])
+
+	os.Remove(filepath.Join(config.Path, "gobe_generated.go"))
 
 	var conf loader.Config
-	conf.Import(os.Args[1])
+	conf.Import(config.Path)
 	conf.TypeChecker.IgnoreFuncBodies = true
 	conf.TypeChecker.DisableUnusedImportCheck = true
 	conf.AllowErrors = true
