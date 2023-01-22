@@ -13,7 +13,7 @@ type Weapon struct {
 
 type Player struct {
 	Name    string
-	Health  uint16
+	Health  CustomUint8
 	Weapons []Weapon
 
 	Position
