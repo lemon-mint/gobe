@@ -104,7 +104,7 @@ func (ns25527 *Player) UnmarshalGOBE(src []byte) (offset uint64, ok bool) {
 	var ns25531 uint64 = uint64(src[offset]) | uint64(src[offset+1])<<8 | uint64(src[offset+2])<<16 | uint64(src[offset+3])<<24 | uint64(src[offset+4])<<32 | uint64(src[offset+5])<<40 | uint64(src[offset+6])<<48 | uint64(src[offset+7])<<56
 	offset += 8
 	if uint64(cap(ns25527.Weapons)) < ns25531 {
-		if ns25531 <= 1<<15 {
+		if ns25531*uint64(18) <= 1<<15 {
 			ns25527.Weapons = make([]Weapon, ns25531)
 			for ns25532 := uint64(0); ns25532 < ns25531; ns25532++ {
 

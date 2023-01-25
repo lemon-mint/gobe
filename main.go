@@ -1292,9 +1292,10 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 			}
 		}
 
+		size := uint64(types.SizesFor("gc", "arm64").Sizeof(v.Elem()))
 		// Pre-allocate slice if __slen is less than 32K
 		//    if uint64(cap(name)) < __slen {
-		//        if __slen <= 1<<15 {
+		//        if __slen*Size <= 1<<15 {
 		//            name = make([]<type>, __slen)
 		//            for __i := uint64(0); __i < __slen; __i++ {
 		//                <unmarshal body>
@@ -1319,10 +1320,13 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 		ctx.Generated[rt] = fmt.Appendf(
 			ctx.Generated[rt],
 			"    if uint64(cap(%s)) < %s {\n"+
-				"        if %s <= 1<<15 {\n"+
+				"        if %s*uint64(%d) <= 1<<15 {\n"+
 				"            %s = make([]%s, %s)\n"+
 				"            for %s := uint64(0); %s < %s; %s++ {\n",
-			name, __slen, __slen, name, Type, __slen, __i, __i, __slen, __i,
+			name, __slen,
+			__slen, size,
+			name, Type, __slen,
+			__i, __i, __slen, __i,
 		)
 		//            <unmarshal body>
 		__value := ctx.nextName()
