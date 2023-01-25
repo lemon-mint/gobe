@@ -2,11 +2,9 @@
 
 Code Generation based Go Type Serialization Library
 
-**Note: This library is still in active development.**
+**Note: GOBE is still under active development.**
 
 **Note: Circular reference is not supported.**
-
-**Warning: UnmarshalGOBE() may cause a DoS vulnerability, do not use it with untrusted data.**
 
 # Usage
 
