@@ -1296,40 +1296,66 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 		//    if uint64(cap(name)) < __slen {
 		//        if __slen <= 1<<15 {
 		//            name = make([]<type>, __slen)
+		//            for __i := uint64(0); __i < __slen; __i++ {
+		//                <unmarshal body>
+		//            }
 		//        } else {
-		//            return
+		//            // Slice too large, Using Append
+		//            name = name[:0]
+		//            for __i := uint64(0); __i < __slen; __i++ {
+		//                var __v <type>
+		//                <unmarshal body>
+		//                name = append(name, __v)
+		//            }
 		//        }
 		//    } else {
 		//        name = name[:__slen]
+		//        for __i := uint64(0); __i < __slen; __i++ {
+		//            <unmarshal body>
+		//        }
 		//    }
 		Type := getTypeName(ctx, v.Elem())
+		__i := ctx.nextName()
 		ctx.Generated[rt] = fmt.Appendf(
 			ctx.Generated[rt],
 			"    if uint64(cap(%s)) < %s {\n"+
 				"        if %s <= 1<<15 {\n"+
 				"            %s = make([]%s, %s)\n"+
+				"            for %s := uint64(0); %s < %s; %s++ {\n",
+			name, __slen, __slen, name, Type, __slen, __i, __i, __slen, __i,
+		)
+		//            <unmarshal body>
+		__value := ctx.nextName()
+		generateUnmarshalBody(ctx, fmt.Sprintf("%s[%s]", name, __i), rt, v.Elem())
+		ctx.Generated[rt] = fmt.Appendf(
+			ctx.Generated[rt],
+			"            }\n"+
 				"        } else {\n"+
-				"            return\n"+
+				"            // Slice too large, Using Append\n"+
+				"            %s = %s[:0]\n"+
+				"            for %s := uint64(0); %s < %s; %s++ {\n"+
+				"                var %s %s\n",
+			name, name, __i, __i, __slen, __i, __value, Type,
+		)
+		//            <unmarshal body>
+		generateUnmarshalBody(ctx, __value, rt, v.Elem())
+		ctx.Generated[rt] = fmt.Appendf(
+			ctx.Generated[rt],
+			"                %s = append(%s, %s)\n"+
+				"            }\n"+
 				"        }\n"+
 				"    } else {\n"+
 				"        %s = %s[:%s]\n"+
+				"        for %s := uint64(0); %s < %s; %s++ {\n",
+			name, name, __value,
+			name, name, __slen, __i, __i, __slen, __i,
+		)
+		//            <unmarshal body>
+		generateUnmarshalBody(ctx, fmt.Sprintf("%s[%s]", name, __i), rt, v.Elem())
+		ctx.Generated[rt] = fmt.Appendf(
+			ctx.Generated[rt],
+			"        }\n"+
 				"    }\n",
-			name, __slen, __slen, name, Type, __slen, name, name, __slen,
-		)
-
-		//	for __i := uint64(0); __i < __slen; __i++ {
-		//	    <unmarshal body>
-		//	}
-		__i := ctx.nextName()
-		ctx.Generated[rt] = fmt.Appendf(
-			ctx.Generated[rt],
-			"    for %s := uint64(0); %s < %s; %s++ {\n",
-			__i, __i, __slen, __i,
-		)
-		generateUnmarshalBody(ctx, name+"["+__i+"]", rt, v.Elem())
-		ctx.Generated[rt] = fmt.Appendf(
-			ctx.Generated[rt],
-			"    }\n",
 		)
 	case *types.Array:
 		if isBasicType(v.Elem()) {
