@@ -425,6 +425,8 @@ func generateMarshalBody(ctx *GenerateContext, name string, __offset string, rt 
 	case *types.Struct:
 		for i := 0; i < v.NumFields(); i++ {
 			f := v.Field(i)
+
+			// ignore unexported fields
 			if !f.Exported() {
 				continue
 			}
@@ -432,6 +434,11 @@ func generateMarshalBody(ctx *GenerateContext, name string, __offset string, rt 
 			// ignore gobe:"-" fields
 			tag := reflect.StructTag(v.Tag(i))
 			if tag.Get("gobe") == "-" {
+				continue
+			}
+
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
 				continue
 			}
 
@@ -937,6 +944,7 @@ func generateSizeBody(ctx *GenerateContext, name string, __size string, rt *type
 	case *types.Struct:
 		for i := 0; i < v.NumFields(); i++ {
 			f := v.Field(i)
+			// ignore unexported fields
 			if !f.Exported() {
 				continue
 			}
@@ -947,6 +955,10 @@ func generateSizeBody(ctx *GenerateContext, name string, __size string, rt *type
 				continue
 			}
 
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
+				continue
+			}
 			generateSizeBody(ctx, name+"."+f.Name(), __size, rt, f.Type())
 		}
 	case *types.Map:
@@ -1167,6 +1179,7 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 	case *types.Struct:
 		for i := 0; i < v.NumFields(); i++ {
 			f := v.Field(i)
+			// ignore unexported fields
 			if !f.Exported() {
 				continue
 			}
@@ -1174,6 +1187,11 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 			// ignore gobe:"-" fields
 			tag := reflect.StructTag(v.Tag(i))
 			if tag.Get("gobe") == "-" {
+				continue
+			}
+
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
 				continue
 			}
 

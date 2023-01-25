@@ -1,4 +1,4 @@
-# GOBE: Go Binary Encoding
+# Go Binary Encoding
 
 Code Generation based Go Type Serialization Library
 
