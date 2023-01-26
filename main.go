@@ -123,6 +123,7 @@ func main() {
 	var root *types.Package
 	gctx := &context{data: make(map[*types.Named]*AnalysisResult)}
 	for _, pkg := range lp.InitialPackages() {
+		scope := pkg.Pkg.Scope()
 		for _, objs := range pkg.Defs {
 			if tn, ok := objs.(*types.TypeName); ok {
 				switch t := tn.Type().(type) {
@@ -132,6 +133,17 @@ func main() {
 						!(t.TypeArgs() != nil && t.TypeArgs().Len() == t.TypeParams().Len()) {
 						continue
 					}
+
+					// Ignore unnamed types.
+					if t.Obj().Name() == "_" {
+						continue
+					}
+
+					// Ignore function scoped types.
+					if scope.Lookup(t.Obj().Name()) != t.Obj() {
+						continue
+					}
+
 					analyzeType(gctx, t)
 				}
 			}
