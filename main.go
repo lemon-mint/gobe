@@ -70,7 +70,7 @@ var config = struct {
 	Version:             flag.Bool("version", false, "Print version and exit"),
 }
 
-const VERSION = "0.0.5"
+const VERSION = "0.0.6"
 const VERSION_STRING = "gobe version v" + VERSION + " " + runtime.GOOS + "/" + runtime.GOARCH
 
 func main() {
@@ -1656,20 +1656,48 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 				__slen,
 			)
 
-			//    if uint64(len(src)) < offset+__slen {
-			//        return
-			//    }
-			//    name = string(src[offset:offset+__slen])
-			//    offset += __slen
-			ctx.Generated[rt] = fmt.Appendf(
-				ctx.Generated[rt],
-				"    if uint64(len(src)) < offset+%s {\n"+
-					"        return\n"+
-					"    }\n"+
-					"    %s = %s(src[offset:offset+%s])\n"+
-					"    offset += %s\n",
-				__slen, name, Type, __slen, __slen,
-			)
+			if *config.AllowZeroCopyString {
+				if !*config.AllowUnsafe {
+					panic("unsafe is not allowed!, please use --allow-unsafe to enable unsafe feature")
+				}
+
+				if _, ok := ctx.LibAlias["unsafe"]; !ok {
+					ctx.LibAlias["unsafe"] = ctx.nextName()
+				}
+				__unsafe := ctx.LibAlias["unsafe"]
+				__str := ctx.nextName()
+				//    if uint64(len(src)) < offset+__slen {
+				//        return
+				//    }
+				//    var __str []byte = src[offset:offset+__slen]
+				//    name = *(*Type)(unsafe.Pointer(&__str))
+				//    offset += __slen
+				ctx.Generated[rt] = fmt.Appendf(
+					ctx.Generated[rt],
+					"    if uint64(len(src)) < offset+%s {\n"+
+						"        return\n"+
+						"    }\n"+
+						"    var %s []byte = src[offset:offset+%s]\n"+
+						"    %s = *(*%s)(%s.Pointer(&%s))\n"+
+						"    offset += %s\n",
+					__slen, __str, __slen, name, Type, __unsafe, __str, __slen,
+				)
+			} else {
+				//    if uint64(len(src)) < offset+__slen {
+				//        return
+				//    }
+				//    name = string(src[offset:offset+__slen])
+				//    offset += __slen
+				ctx.Generated[rt] = fmt.Appendf(
+					ctx.Generated[rt],
+					"    if uint64(len(src)) < offset+%s {\n"+
+						"        return\n"+
+						"    }\n"+
+						"    %s = %s(src[offset:offset+%s])\n"+
+						"    offset += %s\n",
+					__slen, name, Type, __slen, __slen,
+				)
+			}
 		}
 	}
 }
