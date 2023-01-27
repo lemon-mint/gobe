@@ -70,7 +70,7 @@ var config = struct {
 	Version:             flag.Bool("version", false, "Print version and exit"),
 }
 
-const VERSION = "0.0.6"
+const VERSION = "0.0.7-dev"
 const VERSION_STRING = "gobe version v" + VERSION + " " + runtime.GOOS + "/" + runtime.GOARCH
 
 func main() {
