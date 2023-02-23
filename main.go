@@ -73,6 +73,11 @@ var config = struct {
 const VERSION = "0.0.7-dev"
 const VERSION_STRING = "gobe version v" + VERSION + " " + runtime.GOOS + "/" + runtime.GOARCH
 
+const (
+	GOBE_TAG      = "gobe"
+	GOBE_ENUM_TAG = "gobe_enum"
+)
+
 func main() {
 	flag.Parse()
 	if *config.Version {
@@ -414,9 +419,12 @@ func generateMarshalBody(ctx *GenerateContext, name string, __offset string, rt 
 
 	switch v := t.(type) {
 	case *types.Struct:
+		var Enums = map[string]map[string]*types.Var{}
+		var ExportedFields = map[string]bool{}
+		var EnumTags = map[*types.Var][2]string{}
+
 		for i := 0; i < v.NumFields(); i++ {
 			f := v.Field(i)
-
 			// ignore unexported fields
 			if !f.Exported() {
 				continue
@@ -424,7 +432,27 @@ func generateMarshalBody(ctx *GenerateContext, name string, __offset string, rt 
 
 			// ignore gobe:"-" fields
 			tag := reflect.StructTag(v.Tag(i))
-			if tag.Get("gobe") == "-" {
+			if tag.Get(GOBE_TAG) == "-" {
+				continue
+			}
+
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
+				continue
+			}
+			ExportedFields[f.Name()] = true
+		}
+
+		for i := 0; i < v.NumFields(); i++ {
+			f := v.Field(i)
+			// ignore unexported fields
+			if !f.Exported() {
+				continue
+			}
+
+			// ignore gobe:"-" fields
+			tag := reflect.StructTag(v.Tag(i))
+			if tag.Get(GOBE_TAG) == "-" {
 				continue
 			}
 
@@ -433,7 +461,108 @@ func generateMarshalBody(ctx *GenerateContext, name string, __offset string, rt 
 				continue
 			}
 
+			// GOBE_ENUM_TAG is a special case
+			if tag.Get(GOBE_ENUM_TAG) != "" {
+				v := strings.Split(tag.Get(GOBE_ENUM_TAG), "=")
+				//
+				// type MyEnum struct {
+				// 		Type Type
+				// 		A    *A `gobe_enum:"Type=AType"`
+				// 		B    *B `gobe_enum:"Type=BType"`
+				// 		C    *C `gobe_enum:"Type=CType"`
+				// }
+				//
+				tag_name := v[0]
+				tag_value := v[1]
+				// switch name.Type {
+				// case AType:
+				//     __size += name.A.ZZSizeGOBE()
+				// case BType:
+				//     __size += name.B.ZZSizeGOBE()
+				// case CType:
+				//     __size += name.C.ZZSizeGOBE()
+				// }
+
+				// check if tag_name is a valid field
+				if !ExportedFields[tag_name] {
+					panic(fmt.Sprintf("invalid or unexported field %s", tag_name))
+				}
+
+				// add to enums
+				if _, ok := Enums[tag_name]; !ok {
+					Enums[tag_name] = map[string]*types.Var{}
+				}
+				if _, ok := Enums[tag_name][tag_value]; ok {
+					panic(fmt.Sprintf("duplicate enum value %s", tag_value))
+				}
+				Enums[tag_name][tag_value] = f
+				EnumTags[f] = [2]string{tag_name, tag_value}
+			}
+		}
+
+		for i := 0; i < v.NumFields(); i++ {
+			f := v.Field(i)
+			// ignore unexported fields
+			if !f.Exported() {
+				continue
+			}
+
+			// ignore gobe:"-" fields
+			tag := reflect.StructTag(v.Tag(i))
+			if tag.Get(GOBE_TAG) == "-" {
+				continue
+			}
+
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
+				continue
+			}
+
+			// GOBE_ENUM_TAG is a special case
+			if tag.Get(GOBE_ENUM_TAG) != "" {
+				continue
+			}
 			generateMarshalBody(ctx, name+"."+f.Name(), __offset, rt, f.Type())
+		}
+
+		// generate enum cases
+		var __enum_names []string
+		for enum_name := range Enums {
+			__enum_names = append(__enum_names, enum_name)
+		}
+		sort.Strings(__enum_names)
+
+		for _, enum_name := range __enum_names {
+			var __enum_keys []string
+			for __enum_value := range Enums[enum_name] {
+				__enum_keys = append(__enum_keys, __enum_value)
+			}
+			sort.Strings(__enum_keys)
+
+			// // ENUM: KEY=<key>
+			// switch name.<key> {
+			// case AType: // <key> == AType
+			//     __size += name.A.ZZSizeGOBE()
+			// }
+			ctx.Generated[rt] = fmt.Appendf(
+				ctx.Generated[rt],
+				"	// ENUM: KEY=<%s>\n"+
+					"	switch %s.%s {\n",
+				enum_name, name, enum_name,
+			)
+			for _, keys := range __enum_keys {
+				f := Enums[enum_name][keys]
+				ctx.Generated[rt] = fmt.Appendf(
+					ctx.Generated[rt],
+					"	case %s: // %s == %s\n",
+					EnumTags[f][1], enum_name, EnumTags[f][1],
+				)
+				generateMarshalBody(ctx, name+"."+f.Name(), __offset, rt, f.Type())
+			}
+			ctx.Generated[rt] = fmt.Appendf(
+				ctx.Generated[rt],
+				"	}\n",
+			)
 		}
 	case *types.Map:
 		__len := ctx.nextName()
@@ -933,6 +1062,10 @@ func generateSizeBody(ctx *GenerateContext, name string, __size string, rt *type
 
 	switch v := t.(type) {
 	case *types.Struct:
+		var Enums = map[string]map[string]*types.Var{}
+		var ExportedFields = map[string]bool{}
+		var EnumTags = map[*types.Var][2]string{}
+
 		for i := 0; i < v.NumFields(); i++ {
 			f := v.Field(i)
 			// ignore unexported fields
@@ -942,7 +1075,7 @@ func generateSizeBody(ctx *GenerateContext, name string, __size string, rt *type
 
 			// ignore gobe:"-" fields
 			tag := reflect.StructTag(v.Tag(i))
-			if tag.Get("gobe") == "-" {
+			if tag.Get(GOBE_TAG) == "-" {
 				continue
 			}
 
@@ -950,8 +1083,131 @@ func generateSizeBody(ctx *GenerateContext, name string, __size string, rt *type
 			if f.Name() == "_" {
 				continue
 			}
+			ExportedFields[f.Name()] = true
+		}
+
+		for i := 0; i < v.NumFields(); i++ {
+			f := v.Field(i)
+			// ignore unexported fields
+			if !f.Exported() {
+				continue
+			}
+
+			// ignore gobe:"-" fields
+			tag := reflect.StructTag(v.Tag(i))
+			if tag.Get(GOBE_TAG) == "-" {
+				continue
+			}
+
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
+				continue
+			}
+
+			// GOBE_ENUM_TAG is a special case
+			if tag.Get(GOBE_ENUM_TAG) != "" {
+				v := strings.Split(tag.Get(GOBE_ENUM_TAG), "=")
+				//
+				// type MyEnum struct {
+				// 		Type Type
+				// 		A    *A `gobe_enum:"Type=AType"`
+				// 		B    *B `gobe_enum:"Type=BType"`
+				// 		C    *C `gobe_enum:"Type=CType"`
+				// }
+				//
+				tag_name := v[0]
+				tag_value := v[1]
+				// switch name.Type {
+				// case AType:
+				//     __size += name.A.ZZSizeGOBE()
+				// case BType:
+				//     __size += name.B.ZZSizeGOBE()
+				// case CType:
+				//     __size += name.C.ZZSizeGOBE()
+				// }
+
+				// check if tag_name is a valid field
+				if !ExportedFields[tag_name] {
+					panic(fmt.Sprintf("invalid or unexported field %s", tag_name))
+				}
+
+				// add to enums
+				if _, ok := Enums[tag_name]; !ok {
+					Enums[tag_name] = map[string]*types.Var{}
+				}
+				if _, ok := Enums[tag_name][tag_value]; ok {
+					panic(fmt.Sprintf("duplicate enum value %s", tag_value))
+				}
+				Enums[tag_name][tag_value] = f
+				EnumTags[f] = [2]string{tag_name, tag_value}
+			}
+		}
+
+		for i := 0; i < v.NumFields(); i++ {
+			f := v.Field(i)
+			// ignore unexported fields
+			if !f.Exported() {
+				continue
+			}
+
+			// ignore gobe:"-" fields
+			tag := reflect.StructTag(v.Tag(i))
+			if tag.Get(GOBE_TAG) == "-" {
+				continue
+			}
+
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
+				continue
+			}
+
+			// GOBE_ENUM_TAG is a special case
+			if tag.Get(GOBE_ENUM_TAG) != "" {
+				continue
+			}
 			generateSizeBody(ctx, name+"."+f.Name(), __size, rt, f.Type())
 		}
+
+		// generate enum cases
+		var __enum_names []string
+		for enum_name := range Enums {
+			__enum_names = append(__enum_names, enum_name)
+		}
+		sort.Strings(__enum_names)
+
+		for _, enum_name := range __enum_names {
+			var __enum_keys []string
+			for __enum_value := range Enums[enum_name] {
+				__enum_keys = append(__enum_keys, __enum_value)
+			}
+			sort.Strings(__enum_keys)
+
+			// // ENUM: KEY=<key>
+			// switch name.<key> {
+			// case AType: // <key> == AType
+			//     __size += name.A.ZZSizeGOBE()
+			// }
+			ctx.Generated[rt] = fmt.Appendf(
+				ctx.Generated[rt],
+				"	// ENUM: KEY=<%s>\n"+
+					"	switch %s.%s {\n",
+				enum_name, name, enum_name,
+			)
+			for _, keys := range __enum_keys {
+				f := Enums[enum_name][keys]
+				ctx.Generated[rt] = fmt.Appendf(
+					ctx.Generated[rt],
+					"	case %s: // %s == %s\n",
+					EnumTags[f][1], enum_name, EnumTags[f][1],
+				)
+				generateSizeBody(ctx, name+"."+f.Name(), __size, rt, f.Type())
+			}
+			ctx.Generated[rt] = fmt.Appendf(
+				ctx.Generated[rt],
+				"	}\n",
+			)
+		}
+
 	case *types.Map:
 		//    __size += 8
 		//    for __key, __value := range name {
@@ -1168,6 +1424,10 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 
 	switch v := t.(type) {
 	case *types.Struct:
+		var Enums = map[string]map[string]*types.Var{}
+		var ExportedFields = map[string]bool{}
+		var EnumTags = map[*types.Var][2]string{}
+
 		for i := 0; i < v.NumFields(); i++ {
 			f := v.Field(i)
 			// ignore unexported fields
@@ -1177,7 +1437,27 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 
 			// ignore gobe:"-" fields
 			tag := reflect.StructTag(v.Tag(i))
-			if tag.Get("gobe") == "-" {
+			if tag.Get(GOBE_TAG) == "-" {
+				continue
+			}
+
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
+				continue
+			}
+			ExportedFields[f.Name()] = true
+		}
+
+		for i := 0; i < v.NumFields(); i++ {
+			f := v.Field(i)
+			// ignore unexported fields
+			if !f.Exported() {
+				continue
+			}
+
+			// ignore gobe:"-" fields
+			tag := reflect.StructTag(v.Tag(i))
+			if tag.Get(GOBE_TAG) == "-" {
 				continue
 			}
 
@@ -1186,7 +1466,108 @@ func generateUnmarshalBody(ctx *GenerateContext, name string, rt *types.Named, t
 				continue
 			}
 
+			// GOBE_ENUM_TAG is a special case
+			if tag.Get(GOBE_ENUM_TAG) != "" {
+				v := strings.Split(tag.Get(GOBE_ENUM_TAG), "=")
+				//
+				// type MyEnum struct {
+				// 		Type Type
+				// 		A    *A `gobe_enum:"Type=AType"`
+				// 		B    *B `gobe_enum:"Type=BType"`
+				// 		C    *C `gobe_enum:"Type=CType"`
+				// }
+				//
+				tag_name := v[0]
+				tag_value := v[1]
+				// switch name.Type {
+				// case AType:
+				//     __size += name.A.ZZSizeGOBE()
+				// case BType:
+				//     __size += name.B.ZZSizeGOBE()
+				// case CType:
+				//     __size += name.C.ZZSizeGOBE()
+				// }
+
+				// check if tag_name is a valid field
+				if !ExportedFields[tag_name] {
+					panic(fmt.Sprintf("invalid or unexported field %s", tag_name))
+				}
+
+				// add to enums
+				if _, ok := Enums[tag_name]; !ok {
+					Enums[tag_name] = map[string]*types.Var{}
+				}
+				if _, ok := Enums[tag_name][tag_value]; ok {
+					panic(fmt.Sprintf("duplicate enum value %s", tag_value))
+				}
+				Enums[tag_name][tag_value] = f
+				EnumTags[f] = [2]string{tag_name, tag_value}
+			}
+		}
+
+		for i := 0; i < v.NumFields(); i++ {
+			f := v.Field(i)
+			// ignore unexported fields
+			if !f.Exported() {
+				continue
+			}
+
+			// ignore gobe:"-" fields
+			tag := reflect.StructTag(v.Tag(i))
+			if tag.Get(GOBE_TAG) == "-" {
+				continue
+			}
+
+			// ignore _ fields (like _ struct{})
+			if f.Name() == "_" {
+				continue
+			}
+
+			// GOBE_ENUM_TAG is a special case
+			if tag.Get(GOBE_ENUM_TAG) != "" {
+				continue
+			}
 			generateUnmarshalBody(ctx, name+"."+f.Name(), rt, f.Type())
+		}
+
+		// generate enum cases
+		var __enum_names []string
+		for enum_name := range Enums {
+			__enum_names = append(__enum_names, enum_name)
+		}
+		sort.Strings(__enum_names)
+
+		for _, enum_name := range __enum_names {
+			var __enum_keys []string
+			for __enum_value := range Enums[enum_name] {
+				__enum_keys = append(__enum_keys, __enum_value)
+			}
+			sort.Strings(__enum_keys)
+
+			// // ENUM: KEY=<key>
+			// switch name.<key> {
+			// case AType: // <key> == AType
+			//     __size += name.A.ZZSizeGOBE()
+			// }
+			ctx.Generated[rt] = fmt.Appendf(
+				ctx.Generated[rt],
+				"	// ENUM: KEY=<%s>\n"+
+					"	switch %s.%s {\n",
+				enum_name, name, enum_name,
+			)
+			for _, keys := range __enum_keys {
+				f := Enums[enum_name][keys]
+				ctx.Generated[rt] = fmt.Appendf(
+					ctx.Generated[rt],
+					"	case %s: // %s == %s\n",
+					EnumTags[f][1], enum_name, EnumTags[f][1],
+				)
+				generateUnmarshalBody(ctx, name+"."+f.Name(), rt, f.Type())
+			}
+			ctx.Generated[rt] = fmt.Appendf(
+				ctx.Generated[rt],
+				"	}\n",
+			)
 		}
 	case *types.Map:
 		//    if uint64(len(src)) < offset+8 {
