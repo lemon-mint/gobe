@@ -6,25 +6,47 @@ Code Generation based Go Type Serialization Library
 
 **Note: Circular reference is not supported.**
 
-# Usage
+## Usage
 
 ```go
 buffer := make([]byte, obj.SizeGOBE())
 obj.MarshalGOBE(buffer)
 ```
 
-# Installation
+## Installation
 
 ```bash
 go install github.com/lemon-mint/gobe@latest
 ```
 
-# Custom Marshaler/Unmarshaler
+## Tagged Union
+
+```go
+type MyEnum struct {
+    Type Type
+    A    *A `gobe_enum:"Type=AType"`
+    B    *B `gobe_enum:"Type=BType"`
+    C    *C `gobe_enum:"Type=CType"`
+}
+```
+
+## Ignored Field
+
+```go
+type MyStruct struct {
+    Name    string
+    Health  CustomUint8
+    Weapons []Weapon
+    Conns   []net.Conn `gobe:"-"` // ignored
+}
+```
+
+## Custom Marshaler/Unmarshaler
 
 ```go
 type GOBE_CUSTOM_TYPE interface {
-	ZZMarshalGOBE(dst []byte) uint64
-	ZZUnmarshalGOBE(src []byte) (offset uint64, ok bool)
-	ZZSizeGOBE() uint64
+    ZZMarshalGOBE(dst []byte) uint64
+    ZZUnmarshalGOBE(src []byte) (offset uint64, ok bool)
+    ZZSizeGOBE() uint64
 }
 ```
